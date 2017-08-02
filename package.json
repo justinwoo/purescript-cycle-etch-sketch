@@ -13,10 +13,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@cycle/xstream-run": "^3.1.0",
-    "xstream": "^8.0.0"
-  },
-  "devDependencies": {
-    "virtual-dom": "^2.1.1"
+    "@cycle/run": "^3.1.0",
+    "xstream": "^10.9.0"
   }
 }

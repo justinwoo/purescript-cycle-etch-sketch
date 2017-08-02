@@ -7,15 +7,13 @@
     "output"
   ],
   "dependencies": {
-    "purescript-xstream": "^0.6.0",
-    "purescript-cycle-run": "^0.3.0",
-    "purescript-halogen": "git://github.com/slamdata/purescript-halogen#73b854562afc388e03869d18abb5a3796cf8176b",
-    "purescript-eff": "^2.0.0",
-    "purescript-js-timers": "^2.0.0",
-    "purescript-sets": "^2.0.0"
+    "purescript-xstream": "^0.9.1",
+    "purescript-cycle-run": "^0.8.0",
+    "purescript-eff": "^3.1.0",
+    "purescript-js-timers": "^3.0.0",
+    "purescript-sets": "^3.0.0",
+    "purescript-halogen": "^2.1.0",
+    "purescript-halogen-css": "^6.0.0"
   },
-  "devDependencies": {},
-  "resolutions": {
-    "purescript-halogen": "73b854562afc388e03869d18abb5a3796cf8176b"
-  }
+  "devDependencies": {}
 }

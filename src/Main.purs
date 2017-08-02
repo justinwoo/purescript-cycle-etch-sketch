@@ -1,26 +1,28 @@
 module Main where
 
-import Prelude
-import Halogen as H
-import Halogen.HTML as HH
-import Control.Cycle (CYCLE, run2)
+import CSS (absolute, backgroundColor, black, border, grey, height, left, position, px, relative, solid, top, width)
+import Control.Cycle (runRecord)
 import Control.Monad.Aff (Aff, runAff)
 import Control.Monad.Aff.AVar (AVAR)
-import Control.Monad.Eff (Eff)
+import Control.Monad.Eff (Eff, kind Effect)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Eff.Exception (EXCEPTION)
 import Control.Monad.Eff.Ref (REF)
-import Control.XStream (fromCallback, STREAM, addListener, Stream)
+import Control.XStream (STREAM, Stream, addListener, fromCallback)
 import DOM (DOM)
 import Data.Array (fromFoldable)
 import Data.Generic (gShow, class Generic)
-import Data.Maybe (Maybe(Just))
+import Data.Int (toNumber)
+import Data.Maybe (Maybe(..))
 import Data.Monoid (mempty)
 import Data.Set (insert, Set)
-import Data.Tuple.Nested (tuple2)
+import Halogen as H
 import Halogen.Aff (runHalogenAff)
 import Halogen.Aff.Util (awaitBody)
-import Halogen.VirtualDOM.Driver (runUI)
+import Halogen.HTML as HH
+import Halogen.HTML.CSS (style)
+import Halogen.VDom.Driver (runUI)
+import Prelude hiding (top)
 
 data Direction
   = Left
@@ -61,28 +63,21 @@ isInvalidPoint state (Coords x y) =
   x < 0 || (state.increment * x) > (state.width - state.increment) ||
   y < 0 || (state.increment * y) > (state.height - state.increment)
 
-ui :: forall m. H.Component HH.HTML Query Void m
-ui = H.component {render, eval, initialState}
+ui :: forall e. H.Component HH.HTML Query Unit Void (Aff e)
+ui = H.component {render, eval, initialState: const initialState, receiver: const Nothing}
   where
-    style = HH.prop (HH.PropName "style") (Just $ HH.AttrName "style")
-
+    px' = px <<< toNumber
     point inc color (Coords x y) = do
-      let x' = show $ inc * x
-      let y' = show $ inc * y
-      let inc' = show inc
+      let x' = inc * x
+      let y' = inc * y
       HH.div
-        [ style $
-            "position: absolute; left: " <>
-            x' <>
-            "px; top: " <>
-            y' <>
-            "px; width: " <>
-            inc' <>
-            "px; height: " <>
-            inc' <>
-            "px; background-color: " <>
-            color <>
-            ";"
+        [ style do
+            position absolute
+            left (px' x')
+            top (px' y')
+            width (px' inc)
+            height (px' inc)
+            backgroundColor color
         ]
         []
 
@@ -93,18 +88,17 @@ ui = H.component {render, eval, initialState}
         [ HH.h1_
           [ HH.text "Hello!!!" ]
         , HH.div
-            [ style $
-                "position: relative; width: " <>
-                show s.width <>
-                "px; height: " <>
-                show s.height <>
-                "px; border: 1px solid black;"
+            [ style do
+                position relative
+                width (px' s.width)
+                height (px' s.height)
+                border solid (px' 1) black
             ] $
-            (point' "black" <$> fromFoldable s.points) <>
-            [point' "grey" s.cursor]
+            (point' black <$> fromFoldable s.points) <>
+            [point' grey s.cursor]
         ]
 
-    eval :: Query ~> H.ComponentDSL State Query Void m
+    eval :: Query ~> H.ComponentDSL State Query Void (Aff e)
     eval (MoveCursor direction next) = do
       H.modify moveCursor
       pure next
@@ -139,13 +133,11 @@ sendDirections app x =
   yolo $ app.query $ H.action $ MoveCursor x
 
 dom :: forall e o.
-  (H.HalogenIO Query o (Aff (H.HalogenEffects (stream :: STREAM | e)))) ->
+  (H.HalogenIO Query o (Aff (stream :: STREAM | e))) ->
   Stream Direction ->
   Eff
-    (H.HalogenEffects
-      ( stream :: STREAM
-      | e
-      )
+    ( stream :: STREAM
+    | e
     )
     (Stream Unit)
 dom app s = do
@@ -157,7 +149,7 @@ dom app s = do
     s
   pure mempty
 
-foreign import data KEYBOARD :: !
+foreign import data KEYBOARD :: Effect
 foreign import onKeyboardDown :: forall e.
   ( Int ->
     Eff
@@ -174,8 +166,8 @@ foreign import onKeyboardDown :: forall e.
     )
     Unit
 
-kb :: forall a e.
-  Stream a ->
+kb :: forall e.
+  Stream Unit ->
   Eff
     ( kb :: KEYBOARD
     , stream :: STREAM
@@ -183,8 +175,8 @@ kb :: forall a e.
     )
     (Stream Direction)
 kb _ = do
-  keycodes <- fromCallback onKeyboardDown
-  pure $ keyCodeToQuery =<< keycodes
+  keys <- fromCallback onKeyboardDown
+  pure $ keyCodeToQuery =<< keys
   where
     keyCodeToQuery = case _ of
       38 -> pure Up
@@ -197,18 +189,18 @@ main :: forall e.
   Eff
     ( avar :: AVAR
     , ref :: REF
-    , err :: EXCEPTION
+    , exception :: EXCEPTION
     , dom :: DOM
     , stream :: STREAM
-    , cycle :: CYCLE
-    , kb :: KEYBOARD
     | e
     )
     Unit
 main = runHalogenAff do
   body <- awaitBody
-  app <- runUI ui body
-  liftEff $ run2 main' (tuple2 (dom app) kb)
+  app <- runUI ui unit body
+  let drivers = {dom: dom app, kb}
+  _ <- liftEff $ runRecord main' drivers
   pure unit
   where
-    main' _ kb' = tuple2 kb' mempty
+    main' :: { dom :: Stream Unit, kb :: Stream Direction } -> { dom :: Stream Direction, kb :: Stream Unit }
+    main' sources = {dom: sources.kb, kb: mempty}
